@@ -1,3 +1,5 @@
-git add .
-git commit -m "Your descriptive commit message here"
-git push origin master
+# Add your remote repository
+git remote add origin <PASTE YOUR REPOSITORY URL HERE>
+
+# Push and overwrite the remote master branch
+git push -u -f origin main
