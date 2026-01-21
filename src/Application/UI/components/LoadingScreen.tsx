@@ -158,7 +158,7 @@ const LoadingScreen: React.FC<LoadingProps> = () => {
                         </div>
                         <div style={styles.headerInfo}>
                             <p>Released: 01/13/2000</p>
-                            <p>HHBIOS (C)2000 Jay Damania Inc.,</p>
+                            <p>HHBIOS (C)2000 Heffernan Henry Inc.,</p>
                         </div>
                     </div>
                     <div style={styles.body} className="loading-screen-body">
@@ -195,7 +195,7 @@ const LoadingScreen: React.FC<LoadingProps> = () => {
                             <p>
                                 All Content Loaded, launching{' '}
                                 <b style={styles.green}>
-                                    'Jay Damania Portfolio Showcase'
+                                    'Henry Heffernan Portfolio Showcase'
                                 </b>{' '}
                                 V1.0
                             </p>
@@ -227,7 +227,7 @@ const LoadingScreen: React.FC<LoadingProps> = () => {
                     <p>But do enjoy what I have done so far :)</p>
                     <div style={styles.spacer} />
                     <div style={styles.spacer} /> */}
-                    <p>Jay Damania Portfolio Showcase 2022</p>
+                    <p>Henry Heffernan Portfolio Showcase 2022</p>
                     {mobileWarning && (
                         <>
                             <br />
