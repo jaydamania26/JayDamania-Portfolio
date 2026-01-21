@@ -1,5 +1,5 @@
 # Add your remote repository
-git remote add origin <PASTE YOUR REPOSITORY URL HERE>
+git remote add origin https://github.com/jaydamania26/JayDamania-Portfolio.git 
 
 # Push and overwrite the remote master branch
 git push -u -f origin main
