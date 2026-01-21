@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      background-color: rgb(0, 0, 0);
+      margin: 0;
+    }
+
+    #webgl {
+      pointer-events: none;
+    }
+
+    #ui-app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      box-sizing: border-box;
+    }
+
+    #ui {
+      position: absolute;
+      overflow: hidden;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      box-sizing: border-box;
+    }
+
+    #monitor-videos {
+      pointer-events: none;
+      position: 'absolute';
+      opacity: 0;
+      width: 0;
+      height: 0;
+      top: 0;
+      left: 0;
+
+    }
+
+    #css {
+      cursor: pointer;
+    }
+
+    #ui-interactive {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 256px;
+    }
+
+    video {
+      position: absolute;
+      top: 0;
+      pointer-events: none;
+    }
+  </style>
+
+  <!-- Primary Meta Tags -->
+  <title>Jay Damania - AI Automation Architect</title>
+  <meta name="title" content="Jay Damania - AI Automation Architect">
+  <meta name="description"
+    content="I'm Jay Damania, a High-Impact AI-Augmented Automation Architect & Business Analyst at Welspun. I leverage LLMs and Python to transform manual operations into high-efficiency workflows.">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <!-- URL taken from your PDF Contact Info -->
+  <meta property="og:url" content="https://jaydamania-portfolio.vercel.app/">
+  <meta property="og:title" content="Jay Damania - AI Automation Architect">
+  <meta property="og:description"
+    content="I'm Jay Damania, a High-Impact AI-Augmented Automation Architect & Business Analyst at Welspun. I leverage LLMs and Python to transform manual operations into high-efficiency workflows.">
+
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <meta property="twitter:url" content="https://jaydamania-portfolio.vercel.app/">
+  <meta name="twitter:url" content="https://jaydamania-portfolio.vercel.app/">
+
+  <meta property="twitter:title" content="Jay Damania - AI Automation Architect">
+  <meta name="twitter:title" content="Jay Damania - AI Automation Architect">
+
+  <meta property="twitter:description"
+    content="I'm Jay Damania, a High-Impact AI-Augmented Automation Architect & Business Analyst at Welspun. I leverage LLMs and Python to transform manual operations into high-efficiency workflows.">
+  <meta name="twitter:description"
+    content="I'm Jay Damania, a High-Impact AI-Augmented Automation Architect & Business Analyst at Welspun. I leverage LLMs and Python to transform manual operations into high-efficiency workflows.">
+
+  <!-- Images: You need to update this URL to a picture of your actual portfolio/face -->
+  <meta property="twitter:image" content="https://jaydamania-portfolio.vercel.app/images/preview.jpg">
+  <meta name="twitter:image" content="https://jaydamania-portfolio.vercel.app/images/preview.jpg">
+  <meta property="og:image" content="https://jaydamania-portfolio.vercel.app/images/preview.jpg">
+  <meta property="og:image:secure" content="https://jaydamania-portfolio.vercel.app/images/preview.jpg">
+
+  <link rel="shortcut icon" href="../static/images/favicon.ico" type="image/x-icon">
+
+  <!-- Global site tag (gtag.js) - Google Analytics -->
+  <!-- Update ID below if you have your own Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=YOUR-GA-ID-HERE"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
+
+    gtag('config', 'YOUR-GA-ID-HERE');
+  </script>
+</head>
+
+<body>
+  <div id="css"></div>
+  <div id="webgl"></div>
+  <div id="overlay"></div>
+  <div id="ui-interactive"></div>
+  <div id="ui"></div>
+  <div id="monitor-videos">
+    <video id="video-1" muted loop autoplay width="0" height="0" src="../static/textures/monitor/video/base-static.mp4"
+      style="opacity: 0;"></video>
+    <video id="video-2" muted loop autoplay width="0" height="0"
+      src="../static/textures/monitor/video/static-texture-layer.mp4" style="opacity: 0;"></video>
+  </div>
+</body>
+
+</html>
