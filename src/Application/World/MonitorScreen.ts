@@ -7,8 +7,6 @@ import Resources from '../Utils/Resources';
 import Sizes from '../Utils/Sizes';
 import Camera from '../Camera/Camera';
 import EventEmitter from '../Utils/EventEmitter';
-import Device from '../Utils/Device';
-import { CameraKey } from '../Camera/Camera';
 
 const SCREEN_SIZE = { w: 1280, h: 1024 };
 const IFRAME_PADDING = 32;
@@ -130,31 +128,6 @@ export default class MonitorScreen extends EventEmitter {
             },
             false
         );
-        
-        // Handle touch events for mobile
-        document.addEventListener(
-            'touchstart',
-            (event) => {
-                if (!Device.isMobile()) return;
-
-                // @ts-ignore
-                if (event.target.id === 'computer-screen') {
-                    // If currently in monitor view, zoom out
-                    if (this.camera.currentKeyframe === CameraKey.MONITOR || this.camera.targetKeyframe === CameraKey.MONITOR) {
-                        this.camera.trigger('leftMonitor');
-                    } else {
-                        // Otherwise, zoom in
-                        this.camera.trigger('enterMonitor');
-                    }
-                } else {
-                    // If tapping anywhere else while in monitor view, zoom out
-                    if (this.camera.currentKeyframe === CameraKey.MONITOR || this.camera.targetKeyframe === CameraKey.MONITOR) {
-                         this.camera.trigger('leftMonitor');
-                    }
-                }
-            },
-            false
-        );
     }
 
     /**
@@ -211,7 +184,7 @@ export default class MonitorScreen extends EventEmitter {
 
         // Set iframe attributes
         // PROD
-        iframe.src = 'https://inner-site-green.vercel.app/';
+        iframe.src = 'https://os.henryheffernan.com/';
         /**
          * Use dev server is query params are present
          *
@@ -537,8 +510,8 @@ export default class MonitorScreen extends EventEmitter {
 
             const distance = Math.sqrt(
                 (camPos.x - dimPos.x) ** 2 +
-                (camPos.y - dimPos.y) ** 2 +
-                (camPos.z - dimPos.z) ** 2
+                    (camPos.y - dimPos.y) ** 2 +
+                    (camPos.z - dimPos.z) ** 2
             );
 
             const opacity = 1 / (distance / 10000);
