@@ -5,6 +5,14 @@ import Application from '../Application';
 import Mouse from '../Utils/Mouse';
 import Sizes from '../Utils/Sizes';
 
+// IMPORT CONFIG
+import { MobileCameraViews, isMobile, getMobileMonitorPosition } from './MobileConfig';
+
+export interface CameraKeyframe {
+    position: THREE.Vector3;
+    focalPoint: THREE.Vector3;
+}
+
 export class CameraKeyframeInstance {
     position: THREE.Vector3;
     focalPoint: THREE.Vector3;
@@ -23,12 +31,12 @@ const keys: { [key in CameraKey]: CameraKeyframe } = {
         focalPoint: new THREE.Vector3(0, -1000, 0),
     },
     monitor: {
-        position: new THREE.Vector3(0, 950, 2000),
+        position: new THREE.Vector3(0, 950, 1300), // PC Default
         focalPoint: new THREE.Vector3(0, 950, 0),
     },
     desk: {
-        position: new THREE.Vector3(0, 1800, 5500),
-        focalPoint: new THREE.Vector3(0, 500, 0),
+        position: new THREE.Vector3(0, 1600, 3200), // PC Default
+        focalPoint: new THREE.Vector3(0, 750, 0),
     },
     loading: {
         position: new THREE.Vector3(-35000, 35000, 35000),
@@ -56,20 +64,18 @@ export class MonitorKeyframe extends CameraKeyframeInstance {
     }
 
     update() {
-        const aspect = this.sizes.height / this.sizes.width;
-        const additionalZoom = this.sizes.width < 768 ? 0 : 600;
-        this.targetPos.z = this.origin.z + aspect * 1200 - additionalZoom;
+        if (isMobile(this.sizes)) {
+            // Use Config for Mobile Position
+            const mobilePos = getMobileMonitorPosition(this.sizes);
+            this.targetPos.copy(mobilePos);
+        } else {
+            // Use PC Default
+            this.targetPos.z = 1300;
+            this.targetPos.y = 950;
+            this.targetPos.x = 0;
+        }
         this.position.copy(this.targetPos);
     }
-}
-
-export class LoadingKeyframe extends CameraKeyframeInstance {
-    constructor() {
-        const keyframe = keys.loading;
-        super(keyframe);
-    }
-
-    update() {}
 }
 
 export class DeskKeyframe extends CameraKeyframeInstance {
@@ -92,23 +98,33 @@ export class DeskKeyframe extends CameraKeyframeInstance {
     }
 
     update() {
-        this.targetFoc.x +=
-            (this.mouse.x - this.sizes.width / 2 - this.targetFoc.x) * 0.05;
-        this.targetFoc.y +=
-            (-(this.mouse.y - this.sizes.height) - this.targetFoc.y) * 0.05;
+        if (isMobile(this.sizes)) {
+            // Use Config for Mobile Position
+            this.targetPos.copy(MobileCameraViews.DESK.POSITION);
+            this.targetFoc.copy(MobileCameraViews.DESK.FOCAL_POINT);
+        } else {
+            // PC Parallax Logic
+            this.targetFoc.x += (this.mouse.x - this.sizes.width / 2 - this.targetFoc.x) * 0.05;
+            this.targetFoc.y += (-(this.mouse.y - this.sizes.height) - this.targetFoc.y) * 0.05;
 
-        this.targetPos.x +=
-            (this.mouse.x - this.sizes.width / 2 - this.targetPos.x) * 0.025;
-        this.targetPos.y +=
-            (-(this.mouse.y - this.sizes.height * 2) - this.targetPos.y) *
-            0.025;
+            this.targetPos.x += (this.mouse.x - this.sizes.width / 2 - this.targetPos.x) * 0.01;
+            this.targetPos.y += (-(this.mouse.y - this.sizes.height * 2) - this.targetPos.y) * 0.01;
 
-        const aspect = this.sizes.height / this.sizes.width;
-        this.targetPos.z = this.origin.z + aspect * 3000 - 1800;
+            this.targetPos.z = this.origin.z;
+            if (this.targetPos.y < 1200) this.targetPos.y = 1200;
+        }
 
         this.focalPoint.copy(this.targetFoc);
         this.position.copy(this.targetPos);
     }
+}
+
+export class LoadingKeyframe extends CameraKeyframeInstance {
+    constructor() {
+        const keyframe = keys.loading;
+        super(keyframe);
+    }
+    update() {}
 }
 
 export class IdleKeyframe extends CameraKeyframeInstance {
@@ -123,13 +139,9 @@ export class IdleKeyframe extends CameraKeyframeInstance {
     }
 
     update() {
-        this.position.x =
-            Math.sin((this.time.elapsed + 19000) * 0.00008) * this.origin.x;
-        this.position.y =
-            Math.sin((this.time.elapsed + 1000) * 0.000004) * 4000 +
-            this.origin.y -
-            3000;
-        this.position.z = this.position.z;
+        this.position.x = Math.sin((this.time.elapsed + 19000) * 0.00008) * this.origin.x;
+        this.position.y = Math.sin((this.time.elapsed + 1000) * 0.000004) * 4000 + this.origin.y - 3000;
+        this.position.z = this.origin.z;
     }
 }
 
@@ -138,6 +150,5 @@ export class OrbitControlsStart extends CameraKeyframeInstance {
         const keyframe = keys.orbitControlsStart;
         super(keyframe);
     }
-
     update() {}
 }
