@@ -25,6 +25,7 @@ export enum CameraKey {
     DESK = 'desk',
     ORBIT_CONTROLS_START = 'orbitControlsStart',
 }
+
 export default class Camera extends EventEmitter {
     application: Application;
     sizes: Sizes;
@@ -44,6 +45,9 @@ export default class Camera extends EventEmitter {
     targetKeyframe: CameraKey | undefined;
     keyframes: { [key in CameraKey]: CameraKeyframeInstance };
 
+    raycaster: THREE.Raycaster;
+    mouse: THREE.Vector2;
+
     constructor() {
         super();
         this.application = new Application();
@@ -58,6 +62,9 @@ export default class Camera extends EventEmitter {
 
         this.freeCam = false;
 
+        this.raycaster = new THREE.Raycaster();
+        this.mouse = new THREE.Vector2();
+
         this.keyframes = {
             idle: new IdleKeyframe(),
             monitor: new MonitorKeyframe(),
@@ -66,28 +73,117 @@ export default class Camera extends EventEmitter {
             orbitControlsStart: new OrbitControlsStart(),
         };
 
+        // Listen for Resize to adjust Mobile View dynamically
+        this.sizes.on('resize', () => this.resize());
+
+        // --- INPUT HANDLING (MOUSE & TOUCH) ---
+        
+        // Desktop Click
         document.addEventListener('mousedown', (event) => {
-            event.preventDefault();
-            // @ts-ignore
-            if (event.target.id === 'prevent-click') return;
-            // print target and current keyframe
-            if (
-                this.currentKeyframe === CameraKey.IDLE ||
-                this.targetKeyframe === CameraKey.IDLE
-            ) {
-                this.transition(CameraKey.DESK);
-            } else if (
-                this.currentKeyframe === CameraKey.DESK ||
-                this.targetKeyframe === CameraKey.DESK
-            ) {
-                this.transition(CameraKey.IDLE);
-            }
+            this.handleInput(event.clientX, event.clientY, event.target);
         });
+
+        // Mobile Touch
+        document.addEventListener('touchstart', (event) => {
+            const touch = event.touches[0];
+            this.handleInput(touch.clientX, touch.clientY, event.target);
+        }, { passive: false });
 
         this.setPostLoadTransition();
         this.setInstance();
         this.setMonitorListeners();
         this.setFreeCamListeners();
+    }
+
+    /**
+     * Unified Input Handler for Mouse and Touch
+     */
+    handleInput(clientX: number, clientY: number, target: any) {
+        // IGNORE: Iframe, Buttons, or UI
+        // @ts-ignore
+        if (target.tagName === 'IFRAME') return;
+        // @ts-ignore
+        if (target.closest('button') || target.closest('a') || target.id === 'prevent-click') return;
+
+        // 1. Calculate Coordinates
+        this.mouse.x = (clientX / this.sizes.width) * 2 - 1;
+        this.mouse.y = -(clientY / this.sizes.height) * 2 + 1;
+
+        // 2. Raycast
+        this.raycaster.setFromCamera(this.mouse, this.instance);
+        const intersects = this.raycaster.intersectObjects(this.scene.children, true);
+
+        // 3. Check for Computer
+        let clickedComputer = false;
+
+        if (intersects.length > 0) {
+            const object = intersects[0].object;
+            const name = object.name.toLowerCase();
+
+            if (
+                name.includes('computer') || 
+                name.includes('monitor') || 
+                name.includes('screen') || 
+                name.includes('display') || 
+                name.includes('pc') ||
+                name.includes('glass') ||
+                name.includes('bezel') ||
+                name.includes('stand')
+            ) {
+                clickedComputer = true;
+            }
+        }
+
+        // --- NAVIGATION LOGIC ---
+
+        // A: Currently Zoomed In
+        if (this.currentKeyframe === CameraKey.MONITOR) {
+            if (clickedComputer) return; // Stay focused
+            this.trigger('leftMonitor'); // Zoom Out
+            return;
+        }
+
+        // B: Zoom In
+        if (clickedComputer) {
+            this.trigger('enterMonitor');
+            return;
+        }
+
+        // C: Navigation (Idle <-> Desk)
+        if (
+            this.currentKeyframe === CameraKey.IDLE ||
+            this.targetKeyframe === CameraKey.IDLE
+        ) {
+            this.transition(CameraKey.DESK);
+        } else if (
+            this.currentKeyframe === CameraKey.DESK ||
+            this.targetKeyframe === CameraKey.DESK
+        ) {
+            this.transition(CameraKey.IDLE);
+        }
+    }
+
+    /**
+     * Helper to check if device is mobile based on width
+     */
+    isMobile() {
+        return this.sizes.width < 768; // Standard tablet/mobile breakpoint
+    }
+
+    /**
+     * Adjusts the Monitor Position based on screen width
+     */
+    getMonitorPosition() {
+        const originalPos = this.keyframes.monitor.position.clone();
+        
+        if (this.isMobile()) {
+            // ON MOBILE: Move camera BACK (increase Z) so the screen fits
+            // You might need to tweak the '600' value depending on your scene scale
+            originalPos.z += 600; 
+            originalPos.y -= 50; // Optional: Adjust height slightly
+        }
+        
+        return originalPos;
     }
 
     transition(
@@ -104,9 +200,17 @@ export default class Camera extends EventEmitter {
         this.targetKeyframe = key;
 
         const keyframe = this.keyframes[key];
+        
+        // DETERMINE TARGET POSITION
+        let targetPos = keyframe.position.clone();
+
+        // If going to MONITOR, calculate mobile offset
+        if (key === CameraKey.MONITOR) {
+            targetPos = this.getMonitorPosition();
+        }
 
         const posTween = new TWEEN.Tween(this.position)
-            .to(keyframe.position, duration)
+            .to(targetPos, duration)
             .easing(easing || TWEEN.Easing.Quintic.InOut)
             .onComplete(() => {
                 this.currentKeyframe = key;
@@ -130,12 +234,13 @@ export default class Camera extends EventEmitter {
             900000
         );
         this.currentKeyframe = CameraKey.LOADING;
-
         this.scene.add(this.instance);
     }
 
     setMonitorListeners() {
         this.on('enterMonitor', () => {
+            if (this.currentKeyframe === CameraKey.MONITOR) return;
+            
             this.transition(
                 CameraKey.MONITOR,
                 2000,
@@ -143,25 +248,25 @@ export default class Camera extends EventEmitter {
             );
             UIEventBus.dispatch('enterMonitor', {});
         });
+
         this.on('leftMonitor', () => {
+            if (this.currentKeyframe === CameraKey.DESK) return;
+
             this.transition(CameraKey.DESK);
             UIEventBus.dispatch('leftMonitor', {});
         });
     }
 
+    // ... (Keep setFreeCamListeners, setPostLoadTransition, createControls as they were)
     setFreeCamListeners() {
         UIEventBus.on('freeCamToggle', (toggle: boolean) => {
-            // if (toggle === this.freeCam) return;
             if (toggle) {
                 this.transition(
                     CameraKey.ORBIT_CONTROLS_START,
                     750,
                     BezierEasing(0.13, 0.99, 0, 1),
                     () => {
-                        this.instance.position.copy(
-                            this.keyframes.orbitControlsStart.position
-                        );
-
+                        this.instance.position.copy(this.keyframes.orbitControlsStart.position);
                         this.orbitControls.update();
                         this.freeCam = true;
                     }
@@ -170,11 +275,7 @@ export default class Camera extends EventEmitter {
                 document.getElementById('webgl').style.pointerEvents = 'auto';
             } else {
                 this.freeCam = false;
-                this.transition(
-                    CameraKey.IDLE,
-                    4000,
-                    TWEEN.Easing.Exponential.Out
-                );
+                this.transition(CameraKey.IDLE, 4000, TWEEN.Easing.Exponential.Out);
                 // @ts-ignore
                 document.getElementById('webgl').style.pointerEvents = 'none';
             }
@@ -187,32 +288,35 @@ export default class Camera extends EventEmitter {
         });
     }
 
-    resize() {
-        this.instance.aspect = this.sizes.width / this.sizes.height;
-        this.instance.updateProjectionMatrix();
-    }
-
     createControls() {
         this.renderer = this.application.renderer;
-        this.orbitControls = new OrbitControls(
-            this.instance,
-            this.renderer.instance.domElement
-        );
-
+        this.orbitControls = new OrbitControls(this.instance, this.renderer.instance.domElement);
         const { x, y, z } = this.keyframes.orbitControlsStart.focalPoint;
         this.orbitControls.target.set(x, y, z);
-
         this.orbitControls.enablePan = false;
         this.orbitControls.enableDamping = true;
-        this.orbitControls.object.position.copy(
-            this.keyframes.orbitControlsStart.position
-        );
+        this.orbitControls.object.position.copy(this.keyframes.orbitControlsStart.position);
         this.orbitControls.dampingFactor = 0.05;
         this.orbitControls.maxPolarAngle = Math.PI / 2;
         this.orbitControls.minDistance = 4000;
         this.orbitControls.maxDistance = 29000;
-
         this.orbitControls.update();
+    }
+
+    resize() {
+        this.instance.aspect = this.sizes.width / this.sizes.height;
+        this.instance.updateProjectionMatrix();
+
+        // If we are currently looking at the monitor and the window resizes (e.g., rotation),
+        // adjust the camera position immediately
+        if (this.currentKeyframe === CameraKey.MONITOR) {
+            const targetPos = this.getMonitorPosition();
+            // Smoothly move to new adjustment or snap
+            new TWEEN.Tween(this.position)
+                .to(targetPos, 500)
+                .easing(TWEEN.Easing.Quadratic.Out)
+                .start();
+        }
     }
 
     update() {
@@ -230,7 +334,9 @@ export default class Camera extends EventEmitter {
             this.keyframes[_key].update();
         }
 
-        if (this.currentKeyframe) {
+        // Only force position from keyframe if NOT in Monitor mode
+        // (Because Monitor mode now calculates its own mobile offset)
+        if (this.currentKeyframe && this.currentKeyframe !== CameraKey.MONITOR) {
             const keyframe = this.keyframes[this.currentKeyframe];
             this.position.copy(keyframe.position);
             this.focalPoint.copy(keyframe.focalPoint);
