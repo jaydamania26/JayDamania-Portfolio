@@ -57,21 +57,39 @@ export default class MonitorScreen extends EventEmitter {
         this.videoTextures = {};
         this.mouseClickInProgress = false;
         this.shouldLeaveMonitor = false;
+        this.isMonitorActive = false;
 
         // Create screen
+        this.createBackButton();
         this.initializeScreenEvents();
         this.createIframe();
         const maxOffset = this.createTextureLayers();
         this.createEnclosingPlanes(maxOffset);
         this.createPerspectiveDimmer(maxOffset);
+        
+        // Listen for monitor state changes
+        this.camera.on('enterMonitor', () => {
+            this.isMonitorActive = true;
+            if (this.backButton) {
+                this.backButton.style.display = 'block';
+            }
+        });
+        
+        this.camera.on('leftMonitor', () => {
+            this.isMonitorActive = false;
+            if (this.backButton) {
+                this.backButton.style.display = 'none';
+            }
+        });
     }
 
-        /**
+    /**
      * NEW: Creates a floating "Back" button that only shows when zoomed in
      */
     createBackButton() {
         const btn = document.createElement('button');
         btn.innerHTML = '&#8592; Back'; // Left arrow symbol
+        btn.className = 'back-button'; // Add class for easier targeting
         
         // --- STYLING ---
         btn.style.position = 'fixed';
@@ -90,17 +108,31 @@ export default class MonitorScreen extends EventEmitter {
         btn.style.display = 'none'; // Hidden by default
         btn.style.backdropFilter = 'blur(4px)';
         btn.style.transition = 'background 0.3s, transform 0.1s';
+        btn.style.touchAction = 'manipulation'; // Improve mobile performance
 
         // Add Hover Effect
         btn.onmouseenter = () => btn.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
         btn.onmouseleave = () => btn.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
         
-        // --- CLICK LOGIC ---
+        // --- CLICK/TOUCH LOGIC ---
         btn.addEventListener('click', (e) => {
             e.stopPropagation(); // Prevent this click from triggering other things
             this.camera.trigger('leftMonitor');
             this.isMonitorActive = false;
             this.backButton.style.display = 'none'; // Hide button immediately
+        });
+
+        btn.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+            btn.style.transform = 'translateX(-50%) scale(0.95)';
+        });
+
+        btn.addEventListener('touchend', (e) => {
+            e.stopPropagation();
+            btn.style.transform = 'translateX(-50%) scale(1)';
+            this.camera.trigger('leftMonitor');
+            this.isMonitorActive = false;
+            this.backButton.style.display = 'none';
         });
 
         // Add to DOM
@@ -109,6 +141,39 @@ export default class MonitorScreen extends EventEmitter {
     }
 
     initializeScreenEvents() {
+        // Handle clicks/touches outside computer screen to go back
+        document.addEventListener(
+            'mousedown',
+            (event) => {
+                // @ts-ignore
+                const targetId = event.target?.id;
+                
+                // If monitor is active and click is NOT on computer or back button
+                if (
+                    this.isMonitorActive &&
+                    targetId !== 'computer-screen' &&
+                    event.target !== this.backButton &&
+                    // @ts-ignore
+                    !event.target?.closest?.('#computer-screen') &&
+                    // @ts-ignore
+                    !event.target?.closest?.('.back-button')
+                ) {
+                    // Check if click is outside the iframe area
+                    this.camera.trigger('leftMonitor');
+                    this.isMonitorActive = false;
+                    return;
+                }
+
+                // @ts-ignore
+                this.inComputer = event.inComputer;
+                this.application.mouse.trigger('mousedown', [event]);
+
+                this.mouseClickInProgress = true;
+                this.prevInComputer = this.inComputer;
+            },
+            false
+        );
+
         document.addEventListener(
             'mousemove',
             (event) => {
@@ -150,18 +215,7 @@ export default class MonitorScreen extends EventEmitter {
             },
             false
         );
-        document.addEventListener(
-            'mousedown',
-            (event) => {
-                // @ts-ignore
-                this.inComputer = event.inComputer;
-                this.application.mouse.trigger('mousedown', [event]);
 
-                this.mouseClickInProgress = true;
-                this.prevInComputer = this.inComputer;
-            },
-            false
-        );
         document.addEventListener(
             'mouseup',
             (event) => {
@@ -176,6 +230,57 @@ export default class MonitorScreen extends EventEmitter {
 
                 this.mouseClickInProgress = false;
                 this.prevInComputer = this.inComputer;
+            },
+            false
+        );
+
+        // Handle touch events for mobile
+        document.addEventListener(
+            'touchstart',
+            (event) => {
+                const touch = event.touches[0];
+                const element = document.elementFromPoint(touch.clientX, touch.clientY);
+                // @ts-ignore
+                const targetId = element?.id;
+
+                // If monitor is active and touch is NOT on computer screen
+                if (
+                    this.isMonitorActive &&
+                    targetId !== 'computer-screen' &&
+                    element !== this.backButton &&
+                    // @ts-ignore
+                    !element?.closest?.('#computer-screen') &&
+                    // @ts-ignore
+                    !element?.closest?.('.back-button')
+                ) {
+                    this.camera.trigger('leftMonitor');
+                    this.isMonitorActive = false;
+                    return;
+                }
+
+                this.application.mouse.trigger('touchstart', [event]);
+            },
+            false
+        );
+
+        document.addEventListener(
+            'touchmove',
+            (event) => {
+                const touch = event.touches[0];
+                const element = document.elementFromPoint(touch.clientX, touch.clientY);
+                // @ts-ignore
+                const targetId = element?.id;
+
+                if (targetId === 'computer-screen') {
+                    // @ts-ignore
+                    event.inComputer = true;
+                    this.camera.trigger('enterMonitor');
+                } else {
+                    // @ts-ignore
+                    event.inComputer = false;
+                }
+
+                this.application.mouse.trigger('touchmove', [event]);
             },
             false
         );
