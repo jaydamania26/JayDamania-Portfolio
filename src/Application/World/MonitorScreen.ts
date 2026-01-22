@@ -217,34 +217,40 @@ export default class MonitorScreen extends EventEmitter {
      * Creates a CSS plane and GL plane to properly occlude the CSS plane
      * @param element the element to create the css plane for
      */
-    // In MonitorScreen.ts
-
     createCssPlane(element: HTMLElement) {
+        // Create CSS3D object
         const object = new CSS3DObject(element);
+
+        // copy monitor position and rotation
         object.position.copy(this.position);
         object.rotation.copy(this.rotation);
+
+        // Add to CSS scene
         this.cssScene.add(object);
 
+        // Create GL plane
         const material = new THREE.MeshLambertMaterial();
         material.side = THREE.DoubleSide;
         material.opacity = 0;
         material.transparent = true;
+        // NoBlending allows the GL plane to occlude the CSS plane
         material.blending = THREE.NoBlending;
 
+        // Create plane geometry
         const geometry = new THREE.PlaneGeometry(
             this.screenSize.width,
             this.screenSize.height
         );
 
+        // Create the GL plane mesh
         const mesh = new THREE.Mesh(geometry, material);
+
+        // Copy the position, rotation and scale of the CSS plane to the GL plane
         mesh.position.copy(object.position);
         mesh.rotation.copy(object.rotation);
         mesh.scale.copy(object.scale);
 
-        // --- FIX START: GIVE THE SCREEN A NAME ---
-        mesh.name = 'computer-screen-hitbox'; 
-        // --- FIX END ---
-
+        // Add to gl scene
         this.scene.add(mesh);
     }
 
@@ -426,7 +432,6 @@ export default class MonitorScreen extends EventEmitter {
             this.createEnclosingPlane(plane);
         }
     }
-    
 
     /**
      * Creates a plane for the enclosing planes
