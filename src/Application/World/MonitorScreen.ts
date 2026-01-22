@@ -242,23 +242,38 @@ export default class MonitorScreen extends EventEmitter {
                 const element = document.elementFromPoint(touch.clientX, touch.clientY);
                 // @ts-ignore
                 const targetId = element?.id;
+                const isComputerScreen = targetId === 'computer-screen' || 
+                    // @ts-ignore
+                    element?.closest?.('#computer-screen');
+                const isBackButton = element === this.backButton || 
+                    // @ts-ignore
+                    element?.closest?.('.back-button');
 
                 // If monitor is active and touch is NOT on computer screen
                 if (
                     this.isMonitorActive &&
-                    targetId !== 'computer-screen' &&
-                    element !== this.backButton &&
-                    // @ts-ignore
-                    !element?.closest?.('#computer-screen') &&
-                    // @ts-ignore
-                    !element?.closest?.('.back-button')
+                    !isComputerScreen &&
+                    !isBackButton
                 ) {
                     this.camera.trigger('leftMonitor');
                     this.isMonitorActive = false;
                     return;
                 }
 
+                // Mark that we're interacting with computer screen
+                if (isComputerScreen) {
+                    // @ts-ignore
+                    event.inComputer = true;
+                    this.inComputer = true;
+                    
+                    // Trigger enter monitor on first touch to computer
+                    if (!this.prevInComputer) {
+                        this.camera.trigger('enterMonitor');
+                    }
+                }
+
                 this.application.mouse.trigger('touchstart', [event]);
+                this.prevInComputer = this.inComputer;
             },
             false
         );
@@ -270,17 +285,41 @@ export default class MonitorScreen extends EventEmitter {
                 const element = document.elementFromPoint(touch.clientX, touch.clientY);
                 // @ts-ignore
                 const targetId = element?.id;
+                const isComputerScreen = targetId === 'computer-screen' || 
+                    // @ts-ignore
+                    element?.closest?.('#computer-screen');
 
-                if (targetId === 'computer-screen') {
+                if (isComputerScreen) {
                     // @ts-ignore
                     event.inComputer = true;
-                    this.camera.trigger('enterMonitor');
+                    this.inComputer = true;
+                    
+                    // Trigger enter monitor on touch move to computer
+                    if (!this.prevInComputer) {
+                        this.camera.trigger('enterMonitor');
+                    }
                 } else {
                     // @ts-ignore
                     event.inComputer = false;
+                    this.inComputer = false;
+                    
+                    // Trigger left monitor if we move away
+                    if (this.prevInComputer) {
+                        this.camera.trigger('leftMonitor');
+                    }
                 }
 
                 this.application.mouse.trigger('touchmove', [event]);
+                this.prevInComputer = this.inComputer;
+            },
+            false
+        );
+
+        document.addEventListener(
+            'touchend',
+            (event) => {
+                this.application.mouse.trigger('touchend', [event]);
+                // Don't reset inComputer on touchend, let touchmove handle state
             },
             false
         );
