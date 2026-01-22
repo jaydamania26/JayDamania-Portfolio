@@ -70,17 +70,35 @@ export default class Camera extends EventEmitter {
             event.preventDefault();
             // @ts-ignore
             if (event.target.id === 'prevent-click') return;
-            // print target and current keyframe
-            if (
+
+            // Check if the click occurred on the computer screen (passed from MonitorScreen logic)
+            // @ts-ignore
+            const isComputerClick = event.inComputer || event.target.id === 'computer-screen';
+
+            // LOGIC FOR CLICKS
+            if (this.currentKeyframe === CameraKey.MONITOR) {
+                // If we are at the monitor, and click ANYWHERE ELSE (not computer), zoom out to Desk
+                if (!isComputerClick) {
+                    this.transition(CameraKey.DESK);
+                }
+            } 
+            else if (
                 this.currentKeyframe === CameraKey.IDLE ||
                 this.targetKeyframe === CameraKey.IDLE
             ) {
+                // From Idle, go to Desk
                 this.transition(CameraKey.DESK);
-            } else if (
+            } 
+            else if (
                 this.currentKeyframe === CameraKey.DESK ||
                 this.targetKeyframe === CameraKey.DESK
             ) {
-                this.transition(CameraKey.IDLE);
+                // If we are at Desk:
+                // If we clicked the computer, do nothing here (MonitorScreen handles the Zoom In)
+                // If we clicked elsewhere, go back to Idle
+                if (!isComputerClick) {
+                    this.transition(CameraKey.IDLE);
+                }
             }
         });
 

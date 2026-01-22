@@ -71,16 +71,21 @@ export default class MonitorScreen extends EventEmitter {
                 // @ts-ignore
                 this.inComputer = event.inComputer;
 
-                if (this.inComputer && !this.prevInComputer) {
-                    this.camera.trigger('enterMonitor');
-                }
+                // REMOVED: Auto zoom on hover
+                // if (this.inComputer && !this.prevInComputer) {
+                //    this.camera.trigger('enterMonitor');
+                // }
 
                 if (
                     !this.inComputer &&
                     this.prevInComputer &&
                     !this.mouseClickInProgress
                 ) {
-                    this.camera.trigger('leftMonitor');
+                    // This handles leaving hover state, but we rely on click for camera now
+                    // keeping this logic for UI consistency if needed, but not forcing camera exit here usually
+                    // unless you want auto-exit on mouse out. 
+                    // Based on request "zoom out i will click anywhere else", we leave this mainly for UI updates.
+                    this.camera.trigger('leftMonitor'); 
                 }
 
                 if (
@@ -105,6 +110,11 @@ export default class MonitorScreen extends EventEmitter {
                 // @ts-ignore
                 this.inComputer = event.inComputer;
                 this.application.mouse.trigger('mousedown', [event]);
+
+                // ADDED: Zoom in when clicking on the computer
+                if (this.inComputer) {
+                    this.camera.trigger('enterMonitor');
+                }
 
                 this.mouseClickInProgress = true;
                 this.prevInComputer = this.inComputer;
