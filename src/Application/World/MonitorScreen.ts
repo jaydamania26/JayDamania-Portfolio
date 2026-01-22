@@ -7,6 +7,7 @@ import Resources from '../Utils/Resources';
 import Sizes from '../Utils/Sizes';
 import Camera from '../Camera/Camera';
 import EventEmitter from '../Utils/EventEmitter';
+import { isMobile } from '../Camera/MobileConfig'; // Ensure MobileConfig.ts is created
 
 const SCREEN_SIZE = { w: 1280, h: 1024 };
 const IFRAME_PADDING = 32;
@@ -33,6 +34,7 @@ export default class MonitorScreen extends EventEmitter {
     mouseClickInProgress: boolean;
     dimmingPlane: THREE.Mesh;
     videoTextures: { [key in string]: THREE.VideoTexture };
+    isMonitorActive: boolean; // Tracks if we are zoomed in
 
     constructor() {
         super();
@@ -48,6 +50,7 @@ export default class MonitorScreen extends EventEmitter {
         this.videoTextures = {};
         this.mouseClickInProgress = false;
         this.shouldLeaveMonitor = false;
+        this.isMonitorActive = false;
 
         // Create screen
         this.initializeScreenEvents();
@@ -58,76 +61,112 @@ export default class MonitorScreen extends EventEmitter {
     }
 
     initializeScreenEvents() {
-        document.addEventListener(
-            'mousemove',
-            (event) => {
-                // @ts-ignore
-                const id = event.target.id;
-                if (id === 'computer-screen') {
+        const isTouch = isMobile(this.sizes);
+
+        // --- 1. PC HOVER LOGIC (Only run on desktop) ---
+        if (!isTouch) {
+            document.addEventListener(
+                'mousemove',
+                (event) => {
                     // @ts-ignore
-                    event.inComputer = true;
-                }
+                    const id = event.target.id;
+                    if (id === 'computer-screen') {
+                        // @ts-ignore
+                        event.inComputer = true;
+                    }
 
-                // @ts-ignore
-                this.inComputer = event.inComputer;
+                    // @ts-ignore
+                    this.inComputer = event.inComputer;
 
-                if (this.inComputer && !this.prevInComputer) {
-                    this.camera.trigger('enterMonitor');
-                }
+                    if (this.inComputer && !this.prevInComputer) {
+                        this.camera.trigger('enterMonitor');
+                        this.isMonitorActive = true;
+                    }
 
-                if (
-                    !this.inComputer &&
-                    this.prevInComputer &&
-                    !this.mouseClickInProgress
-                ) {
-                    this.camera.trigger('leftMonitor');
-                }
+                    if (
+                        !this.inComputer &&
+                        this.prevInComputer &&
+                        !this.mouseClickInProgress
+                    ) {
+                        this.camera.trigger('leftMonitor');
+                        this.isMonitorActive = false;
+                    }
 
-                if (
-                    !this.inComputer &&
-                    this.mouseClickInProgress &&
-                    this.prevInComputer
-                ) {
-                    this.shouldLeaveMonitor = true;
-                } else {
-                    this.shouldLeaveMonitor = false;
-                }
+                    if (
+                        !this.inComputer &&
+                        this.mouseClickInProgress &&
+                        this.prevInComputer
+                    ) {
+                        this.shouldLeaveMonitor = true;
+                    } else {
+                        this.shouldLeaveMonitor = false;
+                    }
 
-                this.application.mouse.trigger('mousemove', [event]);
+                    this.application.mouse.trigger('mousemove', [event]);
+                    this.prevInComputer = this.inComputer;
+                },
+                false
+            );
+        }
 
-                this.prevInComputer = this.inComputer;
-            },
-            false
-        );
-        document.addEventListener(
-            'mousedown',
-            (event) => {
-                // @ts-ignore
-                this.inComputer = event.inComputer;
-                this.application.mouse.trigger('mousedown', [event]);
+        // --- 2. UNIVERSAL CLICK / TOUCH LOGIC ---
+        // Handles entering on mobile, and dragging/interactions on all devices
+        const handleDown = (event: Event) => {
+            // @ts-ignore
+            const id = event.target.id;
+            // Check if we touched the iframe or an element inside the iframe bubbled up
+            // @ts-ignore
+            const insideMonitor = id === 'computer-screen' || event.inComputer;
 
-                this.mouseClickInProgress = true;
-                this.prevInComputer = this.inComputer;
-            },
-            false
-        );
-        document.addEventListener(
-            'mouseup',
-            (event) => {
-                // @ts-ignore
-                this.inComputer = event.inComputer;
-                this.application.mouse.trigger('mouseup', [event]);
+            // @ts-ignore
+            this.inComputer = insideMonitor;
+            this.application.mouse.trigger('mousedown', [event]);
 
-                if (this.shouldLeaveMonitor) {
-                    this.camera.trigger('leftMonitor');
-                    this.shouldLeaveMonitor = false;
-                }
+            // MOBILE: If we tap the screen and aren't active yet -> ZOOM IN
+            if (isTouch && insideMonitor && !this.isMonitorActive) {
+                this.camera.trigger('enterMonitor');
+                this.isMonitorActive = true;
+            }
 
-                this.mouseClickInProgress = false;
-                this.prevInComputer = this.inComputer;
-            },
-            false
-        );
+            this.mouseClickInProgress = true;
+            this.prevInComputer = this.inComputer;
+        };
+
+        document.addEventListener('mousedown', handleDown, false);
+        document.addEventListener('touchstart', handleDown, { passive: false });
+
+
+        // --- 3. UNIVERSAL RELEASE LOGIC ---
+        // Handles exiting on mobile (tap outside) and desktop (drag release outside)
+        const handleUp = (event: Event) => {
+             // @ts-ignore
+             const id = event.target.id;
+             // @ts-ignore
+             const insideMonitor = id === 'computer-screen' || event.inComputer;
+
+            // @ts-ignore
+            this.inComputer = insideMonitor;
+            this.application.mouse.trigger('mouseup', [event]);
+
+            // DESKTOP: Leave if we started a click inside but dragged outside
+            if (!isTouch && this.shouldLeaveMonitor) {
+                this.camera.trigger('leftMonitor');
+                this.isMonitorActive = false;
+                this.shouldLeaveMonitor = false;
+            }
+
+            // MOBILE: Leave if we are Active, but clicked OUTSIDE the computer
+            if (isTouch && this.isMonitorActive && !insideMonitor) {
+                this.camera.trigger('leftMonitor');
+                this.isMonitorActive = false;
+            }
+
+            this.mouseClickInProgress = false;
+            this.prevInComputer = this.inComputer;
+        };
+
+        document.addEventListener('mouseup', handleUp, false);
+        document.addEventListener('touchend', handleUp, false);
     }
 
     /**
@@ -178,6 +217,10 @@ export default class MonitorScreen extends EventEmitter {
                     }
 
                     iframe.dispatchEvent(evt);
+                    
+                    // IMPORTANT: Dispatch to document so our MonitorScreen event listeners catch it
+                    // This allows us to know a click happened "inside" even if it was in the iframe
+                    document.dispatchEvent(evt);
                 });
             }
         };
@@ -187,10 +230,6 @@ export default class MonitorScreen extends EventEmitter {
         iframe.src = 'https://inner-site-green.vercel.app/';
         /**
          * Use dev server is query params are present
-         *
-         * Warning: This will not work unless the dev server is running on localhost:3000
-         * Also running the dev server causes browsers to freak out over unsecure connections
-         * in the iframe, so it will flag a ton of issues.
          */
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.has('dev')) {
@@ -205,6 +244,7 @@ export default class MonitorScreen extends EventEmitter {
         iframe.id = 'computer-screen';
         iframe.frameBorder = '0';
         iframe.title = 'HeffernanOS';
+        iframe.style.pointerEvents = 'auto'; // Ensure clicks register
 
         // Add iframe to container
         container.appendChild(iframe);
