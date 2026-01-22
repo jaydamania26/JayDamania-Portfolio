@@ -16,7 +16,7 @@ export const MobileSettings = {
     
     // The Monitor View (Zoomed In)
     MONITOR: {
-        BASE_Z: 3200,  // Start this far back
+        BASE_Z: 2700,  // Start this far back
         HEIGHT_Y: 950, // Keep centered vertically
     }
 };
