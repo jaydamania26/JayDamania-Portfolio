@@ -7,7 +7,7 @@ import Resources from '../Utils/Resources';
 import Sizes from '../Utils/Sizes';
 import Camera from '../Camera/Camera';
 import EventEmitter from '../Utils/EventEmitter';
-import UIEventBus from '../UI/EventBus'; // Ensure this path is correct for your project
+import UIEventBus from '../UI/EventBus';
 
 const SCREEN_SIZE = { w: 1280, h: 1024 };
 const IFRAME_PADDING = 32;
@@ -54,7 +54,7 @@ export default class MonitorScreen extends EventEmitter {
         this.shouldLeaveMonitor = false;
 
         // Create screen components
-        this.createIframe(); // This now handles the blocker too
+        this.createIframe(); 
         const maxOffset = this.createTextureLayers();
         this.createEnclosingPlanes(maxOffset);
         this.createPerspectiveDimmer(maxOffset);
@@ -68,14 +68,14 @@ export default class MonitorScreen extends EventEmitter {
      * Listens to the App-wide events to know when to enable/disable the click blocker
      */
     setupBlockerState() {
-        // When we enter the monitor, turn off the blocker so we can use the PC
+        // When we enter the monitor, turn off the blocker so we can interact with the website
         UIEventBus.on('enterMonitor', () => {
             if (this.blocker) {
                 this.blocker.style.pointerEvents = 'none';
             }
         });
 
-        // When we leave, turn it back on so we can click it again
+        // When we leave, turn it back on so clicking the screen zooms us back in
         UIEventBus.on('leftMonitor', () => {
             if (this.blocker) {
                 this.blocker.style.pointerEvents = 'auto';
@@ -84,7 +84,6 @@ export default class MonitorScreen extends EventEmitter {
     }
 
     initializeScreenEvents() {
-        // We keep the mousemove logic for leaving, but rely on the Blocker for entering
         document.addEventListener(
             'mousemove',
             (event) => {
@@ -98,15 +97,15 @@ export default class MonitorScreen extends EventEmitter {
                 // @ts-ignore
                 this.inComputer = event.inComputer;
 
-                // REMOVED: The logic that triggers enterMonitor on hover.
-                // We strictly want click-to-enter now.
-
+                // Logic to help determine if we should leave the monitor 
+                // based on interactions inside the iframe (optional, but good to keep)
                 if (
                     !this.inComputer &&
                     this.prevInComputer &&
                     !this.mouseClickInProgress
                 ) {
-                    this.camera.trigger('leftMonitor');
+                   // This was the old way to leave, we now mostly rely on Camera.ts raycasting
+                   // but we keep this for specific iframe message events.
                 }
 
                 if (
@@ -200,6 +199,7 @@ export default class MonitorScreen extends EventEmitter {
             }
         };
 
+        // Your specific URL
         iframe.src = 'https://inner-site-green.vercel.app/';
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.has('dev')) {
@@ -235,9 +235,9 @@ export default class MonitorScreen extends EventEmitter {
             this.camera.trigger('enterMonitor');
         });
         
-        // Also listen for mousedown to stop propagation if needed
+        // Also listen for mousedown to stop propagation so the camera raycaster doesn't get confused
         blocker.addEventListener('mousedown', (e) => {
-            e.stopPropagation(); // Stop the raycaster from doing other things
+            e.stopPropagation(); 
         });
 
         this.blocker = blocker;
