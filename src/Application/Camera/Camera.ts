@@ -240,3 +240,52 @@ export default class Camera extends EventEmitter {
         this.instance.lookAt(this.focalPoint);
     }
 }
+// ... (Imports stay the same)
+
+// INSIDE CONSTRUCTOR - This is the crucial logic for "Zoom Out when clicking background"
+document.addEventListener('mousedown', (event) => {
+    // IGNORE clicks on UI or Iframe
+    // @ts-ignore
+    if (event.target.tagName !== 'CANVAS') return;
+    // @ts-ignore
+    if (event.target.id === 'prevent-click') return;
+
+    // 1. Raycast
+    this.mouse.x = (event.clientX / this.sizes.width) * 2 - 1;
+    this.mouse.y = -(event.clientY / this.sizes.height) * 2 + 1;
+    this.raycaster.setFromCamera(this.mouse, this.instance);
+    const intersects = this.raycaster.intersectObjects(this.scene.children, true);
+
+    // 2. Did we hit the Computer?
+    let clickedComputer = false;
+    if (intersects.length > 0) {
+        const name = intersects[0].object.name.toLowerCase();
+        if (name.includes('computer') || name.includes('monitor') || name.includes('screen') || name.includes('glass')) {
+            clickedComputer = true;
+        }
+    }
+
+    // 3. Logic
+    if (this.currentKeyframe === CameraKey.MONITOR) {
+        // We are Zoomed In
+        if (!clickedComputer) {
+            // Clicked Background -> ZOOM OUT
+            this.trigger('leftMonitor'); 
+        }
+        // If clickedComputer is true, do nothing (Stay Zoomed)
+    } 
+    else {
+        // We are Zoomed Out
+        if (clickedComputer) {
+            // Clicked Computer -> ZOOM IN
+            this.trigger('enterMonitor');
+        } else {
+            // Clicked Background -> Toggle Desk/Idle (Existing behavior)
+             if (this.currentKeyframe === CameraKey.IDLE || this.targetKeyframe === CameraKey.IDLE) {
+                this.transition(CameraKey.DESK);
+            } else if (this.currentKeyframe === CameraKey.DESK || this.targetKeyframe === CameraKey.DESK) {
+                this.transition(CameraKey.IDLE);
+            }
+        }
+    }
+});
