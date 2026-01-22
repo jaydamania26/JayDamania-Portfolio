@@ -7,6 +7,7 @@ import Resources from '../Utils/Resources';
 import Sizes from '../Utils/Sizes';
 import Camera from '../Camera/Camera';
 import EventEmitter from '../Utils/EventEmitter';
+import Device from '../Utils/Device';
 
 const SCREEN_SIZE = { w: 1280, h: 1024 };
 const IFRAME_PADDING = 32;
@@ -14,6 +15,12 @@ const IFRAME_SIZE = {
     w: SCREEN_SIZE.w - IFRAME_PADDING,
     h: SCREEN_SIZE.h - IFRAME_PADDING,
 };
+
+interface EnclosingPlane {
+    size: THREE.Vector2;
+    position: THREE.Vector3;
+    rotation: THREE.Euler;
+}
 
 export default class MonitorScreen extends EventEmitter {
     application: Application;
@@ -33,6 +40,8 @@ export default class MonitorScreen extends EventEmitter {
     mouseClickInProgress: boolean;
     dimmingPlane: THREE.Mesh;
     videoTextures: { [key in string]: THREE.VideoTexture };
+    isMonitorActive: boolean; 
+    backButton: HTMLButtonElement; // NEW: Reference to the button
 
     constructor() {
         super();
@@ -55,6 +64,48 @@ export default class MonitorScreen extends EventEmitter {
         const maxOffset = this.createTextureLayers();
         this.createEnclosingPlanes(maxOffset);
         this.createPerspectiveDimmer(maxOffset);
+    }
+
+        /**
+     * NEW: Creates a floating "Back" button that only shows when zoomed in
+     */
+    createBackButton() {
+        const btn = document.createElement('button');
+        btn.innerHTML = '&#8592; Back'; // Left arrow symbol
+        
+        // --- STYLING ---
+        btn.style.position = 'fixed';
+        btn.style.bottom = '30px'; // Position at bottom
+        btn.style.left = '50%';
+        btn.style.transform = 'translateX(-50%)'; // Center horizontally
+        btn.style.padding = '12px 24px';
+        btn.style.fontSize = '16px';
+        btn.style.fontWeight = 'bold';
+        btn.style.color = 'white';
+        btn.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+        btn.style.border = '1px solid rgba(255, 255, 255, 0.3)';
+        btn.style.borderRadius = '25px';
+        btn.style.cursor = 'pointer';
+        btn.style.zIndex = '10000'; // Ensure it is above the 3D canvas and iframe
+        btn.style.display = 'none'; // Hidden by default
+        btn.style.backdropFilter = 'blur(4px)';
+        btn.style.transition = 'background 0.3s, transform 0.1s';
+
+        // Add Hover Effect
+        btn.onmouseenter = () => btn.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
+        btn.onmouseleave = () => btn.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+        
+        // --- CLICK LOGIC ---
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent this click from triggering other things
+            this.camera.trigger('leftMonitor');
+            this.isMonitorActive = false;
+            this.backButton.style.display = 'none'; // Hide button immediately
+        });
+
+        // Add to DOM
+        document.body.appendChild(btn);
+        this.backButton = btn;
     }
 
     initializeScreenEvents() {
