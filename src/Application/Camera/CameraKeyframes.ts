@@ -4,7 +4,6 @@ import Time from '../Utils/Time';
 import Application from '../Application';
 import Mouse from '../Utils/Mouse';
 import Sizes from '../Utils/Sizes';
-import { isMobile, getMobileMonitorPosition } from './MobileConfig'; // Ensure MobileConfig.ts is created
 
 export class CameraKeyframeInstance {
     position: THREE.Vector3;
@@ -57,19 +56,10 @@ export class MonitorKeyframe extends CameraKeyframeInstance {
     }
 
     update() {
-        // --- MOBILE FIX START ---
-        if (isMobile(this.sizes)) {
-            // Calculate perfect distance for portrait mode
-            const mobilePos = getMobileMonitorPosition(this.sizes);
-            this.position.copy(mobilePos);
-        } else {
-            // Original PC Logic
-            const aspect = this.sizes.height / this.sizes.width;
-            const additionalZoom = this.sizes.width < 768 ? 0 : 600;
-            this.targetPos.z = this.origin.z + aspect * 1200 - additionalZoom;
-            this.position.copy(this.targetPos);
-        }
-        // --- MOBILE FIX END ---
+        const aspect = this.sizes.height / this.sizes.width;
+        const additionalZoom = this.sizes.width < 768 ? 0 : 600;
+        this.targetPos.z = this.origin.z + aspect * 1200 - additionalZoom;
+        this.position.copy(this.targetPos);
     }
 }
 
@@ -102,29 +92,19 @@ export class DeskKeyframe extends CameraKeyframeInstance {
     }
 
     update() {
-        // Reduce sensitivity on mobile so the camera doesn't fly around too much
-        const sensitivity = isMobile(this.sizes) ? 0.01 : 0.05;
-        const posSensitivity = isMobile(this.sizes) ? 0.005 : 0.025;
-
         this.targetFoc.x +=
-            (this.mouse.x - this.sizes.width / 2 - this.targetFoc.x) * sensitivity;
+            (this.mouse.x - this.sizes.width / 2 - this.targetFoc.x) * 0.05;
         this.targetFoc.y +=
-            (-(this.mouse.y - this.sizes.height) - this.targetFoc.y) * sensitivity;
+            (-(this.mouse.y - this.sizes.height) - this.targetFoc.y) * 0.05;
 
         this.targetPos.x +=
-            (this.mouse.x - this.sizes.width / 2 - this.targetPos.x) * posSensitivity;
+            (this.mouse.x - this.sizes.width / 2 - this.targetPos.x) * 0.025;
         this.targetPos.y +=
             (-(this.mouse.y - this.sizes.height * 2) - this.targetPos.y) *
-            posSensitivity;
+            0.025;
 
         const aspect = this.sizes.height / this.sizes.width;
-
-        // On mobile, keep the desk view slightly static to prevent disorientation
-        if (isMobile(this.sizes)) {
-             this.targetPos.z = this.origin.z + 1000;
-        } else {
-             this.targetPos.z = this.origin.z + aspect * 3000 - 1800;
-        }
+        this.targetPos.z = this.origin.z + aspect * 3000 - 1800;
 
         this.focalPoint.copy(this.targetFoc);
         this.position.copy(this.targetPos);
