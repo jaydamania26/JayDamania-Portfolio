@@ -25,6 +25,7 @@ export enum CameraKey {
     DESK = 'desk',
     ORBIT_CONTROLS_START = 'orbitControlsStart',
 }
+
 export default class Camera extends EventEmitter {
     application: Application;
     sizes: Sizes;
@@ -44,6 +45,10 @@ export default class Camera extends EventEmitter {
     targetKeyframe: CameraKey | undefined;
     keyframes: { [key in CameraKey]: CameraKeyframeInstance };
 
+    // Tools for click detection
+    raycaster: THREE.Raycaster;
+    mouse: THREE.Vector2;
+
     constructor() {
         super();
         this.application = new Application();
@@ -58,6 +63,9 @@ export default class Camera extends EventEmitter {
 
         this.freeCam = false;
 
+        this.raycaster = new THREE.Raycaster();
+        this.mouse = new THREE.Vector2();
+
         this.keyframes = {
             idle: new IdleKeyframe(),
             monitor: new MonitorKeyframe(),
@@ -66,11 +74,65 @@ export default class Camera extends EventEmitter {
             orbitControlsStart: new OrbitControlsStart(),
         };
 
+        // --- MOUSE CLICK LOGIC ---
         document.addEventListener('mousedown', (event) => {
-            event.preventDefault();
+            // 1. Only process clicks on the 3D Canvas
+            // @ts-ignore
+            if (event.target.tagName !== 'CANVAS') return;
             // @ts-ignore
             if (event.target.id === 'prevent-click') return;
-            // print target and current keyframe
+
+            // 2. Calculate Mouse Position
+            this.mouse.x = (event.clientX / this.sizes.width) * 2 - 1;
+            this.mouse.y = -(event.clientY / this.sizes.height) * 2 + 1;
+
+            // 3. Raycast to see what was clicked
+            this.raycaster.setFromCamera(this.mouse, this.instance);
+            const intersects = this.raycaster.intersectObjects(this.scene.children, true);
+
+            // 4. Determine if we hit the Computer Model
+            let clickedComputer = false;
+
+            if (intersects.length > 0) {
+                // We check the name of the object (or its parents)
+                const object = intersects[0].object;
+                const name = object.name.toLowerCase();
+                
+                // Add keywords that match your specific 3D model naming
+                if (
+                    name.includes('computer') || 
+                    name.includes('monitor') || 
+                    name.includes('screen') || 
+                    name.includes('display') || 
+                    name.includes('pc') ||
+                    name.includes('glass') ||
+                    name.includes('bezel')
+                ) {
+                    clickedComputer = true;
+                }
+            }
+
+            // --- NAVIGATION LOGIC ---
+
+            // CASE A: We are currently ZOOMED IN (Looking at Monitor)
+            if (this.currentKeyframe === CameraKey.MONITOR) {
+                // If we clicked the Computer (Plastic/Bezel/Stand) -> STAY THERE.
+                if (clickedComputer) {
+                    return; 
+                }
+
+                // If we clicked the BACKGROUND (Empty space or Wall) -> ZOOM OUT.
+                this.trigger('leftMonitor');
+                return;
+            }
+
+            // CASE B: We are NOT zoomed in -> Zoom In if clicking Computer
+            if (clickedComputer) {
+                this.trigger('enterMonitor');
+                return;
+            }
+
+            // CASE C: Clicking Background while NOT zoomed in -> Toggle Desk/Idle
             if (
                 this.currentKeyframe === CameraKey.IDLE ||
                 this.targetKeyframe === CameraKey.IDLE
@@ -136,6 +198,8 @@ export default class Camera extends EventEmitter {
 
     setMonitorListeners() {
         this.on('enterMonitor', () => {
+            if (this.currentKeyframe === CameraKey.MONITOR) return;
+            
             this.transition(
                 CameraKey.MONITOR,
                 2000,
@@ -143,7 +207,11 @@ export default class Camera extends EventEmitter {
             );
             UIEventBus.dispatch('enterMonitor', {});
         });
+
         this.on('leftMonitor', () => {
+            // Prevent leaving if we are already at Desk
+            if (this.currentKeyframe === CameraKey.DESK) return;
+
             this.transition(CameraKey.DESK);
             UIEventBus.dispatch('leftMonitor', {});
         });
@@ -151,7 +219,6 @@ export default class Camera extends EventEmitter {
 
     setFreeCamListeners() {
         UIEventBus.on('freeCamToggle', (toggle: boolean) => {
-            // if (toggle === this.freeCam) return;
             if (toggle) {
                 this.transition(
                     CameraKey.ORBIT_CONTROLS_START,
