@@ -83,23 +83,20 @@ export default class Camera extends EventEmitter {
             this.handleInput(event.clientX, event.clientY, event.target);
         });
 
-        // Mobile Touch
+        // Mobile Touch Listener
         document.addEventListener('touchstart', (event) => {
             const touch = event.touches[0];
+            // Pass the target so we can check if it's the Blocker
             this.handleInput(touch.clientX, touch.clientY, event.target);
         }, { passive: false });
-
-        this.setPostLoadTransition();
-        this.setInstance();
-        this.setMonitorListeners();
-        this.setFreeCamListeners();
     }
 
     /**
      * Unified Input Handler for Mouse and Touch
      */
+// ... update the handleInput function ...
+
     handleInput(clientX: number, clientY: number, target: any) {
-        // IGNORE: Iframe, Buttons, or UI
         // @ts-ignore
         if (target.tagName === 'IFRAME') return;
         // @ts-ignore
@@ -113,7 +110,7 @@ export default class Camera extends EventEmitter {
         this.raycaster.setFromCamera(this.mouse, this.instance);
         const intersects = this.raycaster.intersectObjects(this.scene.children, true);
 
-        // 3. Check for Computer
+        // 3. Check for Computer OR The Screen Hitbox
         let clickedComputer = false;
 
         if (intersects.length > 0) {
@@ -128,21 +125,20 @@ export default class Camera extends EventEmitter {
                 name.includes('pc') ||
                 name.includes('glass') ||
                 name.includes('bezel') ||
-                name.includes('stand')
+                name.includes('stand') ||
+                name.includes('hitbox') // <--- This detects the invisible plane now
             ) {
                 clickedComputer = true;
             }
         }
 
-        // --- NAVIGATION LOGIC ---
-
+        // ... rest of the logic (A, B, C) remains the same ...
         // A: Currently Zoomed In
         if (this.currentKeyframe === CameraKey.MONITOR) {
-            if (clickedComputer) return; // Stay focused
-            this.trigger('leftMonitor'); // Zoom Out
+            if (clickedComputer) return; 
+            this.trigger('leftMonitor'); 
             return;
         }
-
         // B: Zoom In
         if (clickedComputer) {
             this.trigger('enterMonitor');
