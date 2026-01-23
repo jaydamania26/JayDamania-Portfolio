@@ -39,11 +39,9 @@ export default class MonitorScreen extends EventEmitter {
     inComputer: boolean;
     mouseClickInProgress: boolean;
     dimmingPlane: THREE.Mesh;
-    screenMesh: THREE.Mesh | null; // The GL plane mesh representing the display screen
     videoTextures: { [key in string]: THREE.VideoTexture };
     isMonitorActive: boolean; 
     backButton: HTMLButtonElement; // NEW: Reference to the button
-    raycaster: THREE.Raycaster; // For detecting clicks on screen mesh
 
     constructor() {
         super();
@@ -60,8 +58,6 @@ export default class MonitorScreen extends EventEmitter {
         this.mouseClickInProgress = false;
         this.shouldLeaveMonitor = false;
         this.isMonitorActive = false;
-        this.raycaster = new THREE.Raycaster(); // Initialize raycaster
-        this.screenMesh = null; // Will be set in createCssPlane
 
         // Create screen
         this.createBackButton();
@@ -85,41 +81,6 @@ export default class MonitorScreen extends EventEmitter {
                 this.backButton.style.display = 'none';
             }
         });
-    }
-
-    /**
-     * Checks if a click/touch position intersects with the screen mesh using raycasting
-     * Normalized device coordinates: x, y in range [-1, 1]
-     */
-    private isClickOnScreenMesh(x: number, y: number): boolean {
-        if (!this.screenMesh) return false;
-
-        // Set raycaster from camera and normalized device coordinates
-        this.raycaster.setFromCamera({ x, y }, this.camera.instance);
-
-        // Check intersection with screen mesh only
-        const intersects = this.raycaster.intersectObject(this.screenMesh);
-
-        // If there's an intersection, click is on screen
-        return intersects.length > 0;
-    }
-
-    /**
-     * Converts screen coordinates (pixels) to normalized device coordinates (-1 to 1)
-     */
-    private screenToNormalizedCoordinates(
-        clientX: number,
-        clientY: number
-    ): { x: number; y: number } {
-        // @ts-ignore
-        const canvas = document.getElementById('webgl');
-        if (!canvas) return { x: 0, y: 0 };
-
-        const rect = canvas.getBoundingClientRect();
-        const x = ((clientX - rect.left) / rect.width) * 2 - 1;
-        const y = -((clientY - rect.top) / rect.height) * 2 + 1;
-
-        return { x, y };
     }
 
     /**
@@ -180,38 +141,31 @@ export default class MonitorScreen extends EventEmitter {
     }
 
     initializeScreenEvents() {
-        // Handle clicks/touches on the 3D screen mesh to trigger zoom
+        // Handle clicks/touches outside computer screen to go back
         document.addEventListener(
             'mousedown',
             (event) => {
-                // Prevent back button from triggering zoom
                 // @ts-ignore
-                if (event.target === this.backButton || event.target?.closest?.('.back-button')) {
-                    return;
-                }
-
-                // Convert mouse position to normalized device coordinates
-                const { x, y } = this.screenToNormalizedCoordinates(
-                    event.clientX,
-                    event.clientY
-                );
-
-                // Check if click is on the screen mesh
-                const clickedOnScreen = this.isClickOnScreenMesh(x, y);
-
-                if (clickedOnScreen && !this.isMonitorActive) {
-                    // Click on screen while NOT zoomed - trigger zoom
-                    this.camera.trigger('enterMonitor');
-                    this.inComputer = true;
-                } else if (!clickedOnScreen && this.isMonitorActive) {
-                    // Click outside screen while zoomed - exit zoom
+                const targetId = event.target?.id;
+                
+                // If monitor is active and click is NOT on computer or back button
+                if (
+                    this.isMonitorActive &&
+                    targetId !== 'computer-screen' &&
+                    event.target !== this.backButton &&
+                    // @ts-ignore
+                    !event.target?.closest?.('#computer-screen') &&
+                    // @ts-ignore
+                    !event.target?.closest?.('.back-button')
+                ) {
+                    // Check if click is outside the iframe area
                     this.camera.trigger('leftMonitor');
                     this.isMonitorActive = false;
                     return;
                 }
 
                 // @ts-ignore
-                this.inComputer = clickedOnScreen || this.inComputer;
+                this.inComputer = event.inComputer;
                 this.application.mouse.trigger('mousedown', [event]);
 
                 this.mouseClickInProgress = true;
@@ -223,17 +177,15 @@ export default class MonitorScreen extends EventEmitter {
         document.addEventListener(
             'mousemove',
             (event) => {
-                // Convert mouse position to normalized device coordinates
-                const { x, y } = this.screenToNormalizedCoordinates(
-                    event.clientX,
-                    event.clientY
-                );
-
-                // Check if mouse is over the screen mesh
-                const isOverScreen = this.isClickOnScreenMesh(x, y);
+                // @ts-ignore
+                const id = event.target.id;
+                if (id === 'computer-screen') {
+                    // @ts-ignore
+                    event.inComputer = true;
+                }
 
                 // @ts-ignore
-                this.inComputer = isOverScreen;
+                this.inComputer = event.inComputer;
 
                 if (this.inComputer && !this.prevInComputer) {
                     this.camera.trigger('enterMonitor');
@@ -268,7 +220,7 @@ export default class MonitorScreen extends EventEmitter {
             'mouseup',
             (event) => {
                 // @ts-ignore
-                this.inComputer = this.inComputer;
+                this.inComputer = event.inComputer;
                 this.application.mouse.trigger('mouseup', [event]);
 
                 if (this.shouldLeaveMonitor) {
@@ -282,34 +234,25 @@ export default class MonitorScreen extends EventEmitter {
             false
         );
 
-        // Handle touch events for mobile (mobile-first approach)
+        // Handle touch events for mobile
         document.addEventListener(
             'touchstart',
             (event) => {
                 const touch = event.touches[0];
-
-                // Prevent back button from triggering zoom
                 const element = document.elementFromPoint(touch.clientX, touch.clientY);
                 // @ts-ignore
-                if (element === this.backButton || element?.closest?.('.back-button')) {
-                    return;
-                }
+                const targetId = element?.id;
 
-                // Convert touch position to normalized device coordinates
-                const { x, y } = this.screenToNormalizedCoordinates(
-                    touch.clientX,
-                    touch.clientY
-                );
-
-                // Check if touch is on the screen mesh
-                const touchedScreen = this.isClickOnScreenMesh(x, y);
-
-                if (touchedScreen && !this.isMonitorActive) {
-                    // Touch on screen while NOT zoomed - trigger zoom
-                    this.camera.trigger('enterMonitor');
-                    this.isMonitorActive = true;
-                } else if (!touchedScreen && this.isMonitorActive) {
-                    // Touch outside screen while zoomed - exit zoom
+                // If monitor is active and touch is NOT on computer screen
+                if (
+                    this.isMonitorActive &&
+                    targetId !== 'computer-screen' &&
+                    element !== this.backButton &&
+                    // @ts-ignore
+                    !element?.closest?.('#computer-screen') &&
+                    // @ts-ignore
+                    !element?.closest?.('.back-button')
+                ) {
                     this.camera.trigger('leftMonitor');
                     this.isMonitorActive = false;
                     return;
@@ -324,22 +267,17 @@ export default class MonitorScreen extends EventEmitter {
             'touchmove',
             (event) => {
                 const touch = event.touches[0];
+                const element = document.elementFromPoint(touch.clientX, touch.clientY);
+                // @ts-ignore
+                const targetId = element?.id;
 
-                // Convert touch position to normalized device coordinates
-                const { x, y } = this.screenToNormalizedCoordinates(
-                    touch.clientX,
-                    touch.clientY
-                );
-
-                // Check if touch is over the screen mesh
-                const isOverScreen = this.isClickOnScreenMesh(x, y);
-
-                if (isOverScreen && !this.isMonitorActive) {
+                if (targetId === 'computer-screen') {
+                    // @ts-ignore
+                    event.inComputer = true;
                     this.camera.trigger('enterMonitor');
-                    this.isMonitorActive = true;
-                } else if (!isOverScreen && this.isMonitorActive) {
-                    this.camera.trigger('leftMonitor');
-                    this.isMonitorActive = false;
+                } else {
+                    // @ts-ignore
+                    event.inComputer = false;
                 }
 
                 this.application.mouse.trigger('touchmove', [event]);
@@ -467,9 +405,6 @@ export default class MonitorScreen extends EventEmitter {
         mesh.position.copy(object.position);
         mesh.rotation.copy(object.rotation);
         mesh.scale.copy(object.scale);
-
-        // Store reference to screen mesh for raycasting zoom detection
-        this.screenMesh = mesh;
 
         // Add to gl scene
         this.scene.add(mesh);
