@@ -41,7 +41,6 @@ export default class MonitorScreen extends EventEmitter {
     dimmingPlane: THREE.Mesh;
     videoTextures: { [key in string]: THREE.VideoTexture };
     isMonitorActive: boolean;
-    backButton: HTMLButtonElement; // Reference to the button
     monitorCover: HTMLDivElement; // NEW: Transparent overlay to capture clicks
 
     constructor() {
