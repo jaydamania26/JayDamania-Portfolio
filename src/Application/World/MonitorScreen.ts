@@ -60,7 +60,6 @@ export default class MonitorScreen extends EventEmitter {
         this.isMonitorActive = false;
 
         // Create screen
-        this.createBackButton();
         this.initializeScreenEvents();
         this.createIframe();
         const maxOffset = this.createTextureLayers();
@@ -70,9 +69,6 @@ export default class MonitorScreen extends EventEmitter {
         // Listen for monitor state changes
         this.camera.on('enterMonitor', () => {
             this.isMonitorActive = true;
-            if (this.backButton) {
-                this.backButton.style.display = 'block';
-            }
             if (this.monitorCover) {
                 this.monitorCover.style.pointerEvents = 'none';
             }
@@ -80,71 +76,12 @@ export default class MonitorScreen extends EventEmitter {
 
         this.camera.on('leftMonitor', () => {
             this.isMonitorActive = false;
-            if (this.backButton) {
-                this.backButton.style.display = 'none';
-            }
             if (this.monitorCover) {
                 this.monitorCover.style.pointerEvents = 'auto';
             }
         });
     }
 
-    /**
-     * NEW: Creates a floating "Back" button that only shows when zoomed in
-     */
-    createBackButton() {
-        const btn = document.createElement('button');
-        btn.innerHTML = '&#8592; Back'; // Left arrow symbol
-        btn.className = 'back-button'; // Add class for easier targeting
-
-        // --- STYLING ---
-        btn.style.position = 'fixed';
-        btn.style.bottom = '30px'; // Position at bottom
-        btn.style.left = '50%';
-        btn.style.transform = 'translateX(-50%)'; // Center horizontally
-        btn.style.padding = '12px 24px';
-        btn.style.fontSize = '16px';
-        btn.style.fontWeight = 'bold';
-        btn.style.color = 'white';
-        btn.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-        btn.style.border = '1px solid rgba(255, 255, 255, 0.3)';
-        btn.style.borderRadius = '25px';
-        btn.style.cursor = 'pointer';
-        btn.style.zIndex = '10000'; // Ensure it is above the 3D canvas and iframe
-        btn.style.display = 'none'; // Hidden by default
-        btn.style.backdropFilter = 'blur(4px)';
-        btn.style.transition = 'background 0.3s, transform 0.1s';
-        btn.style.touchAction = 'manipulation'; // Improve mobile performance
-
-        // Add Hover Effect
-        btn.onmouseenter = () => btn.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
-        btn.onmouseleave = () => btn.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-
-        // --- CLICK/TOUCH LOGIC ---
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation(); // Prevent this click from triggering other things
-            this.camera.trigger('leftMonitor');
-            this.isMonitorActive = false;
-            this.backButton.style.display = 'none'; // Hide button immediately
-        });
-
-        btn.addEventListener('touchstart', (e) => {
-            e.stopPropagation();
-            btn.style.transform = 'translateX(-50%) scale(0.95)';
-        });
-
-        btn.addEventListener('touchend', (e) => {
-            e.stopPropagation();
-            btn.style.transform = 'translateX(-50%) scale(1)';
-            this.camera.trigger('leftMonitor');
-            this.isMonitorActive = false;
-            this.backButton.style.display = 'none';
-        });
-
-        // Add to DOM
-        document.body.appendChild(btn);
-        this.backButton = btn;
-    }
 
     initializeScreenEvents() {
         // Handle clicks/touches outside computer screen to go back
@@ -158,11 +95,8 @@ export default class MonitorScreen extends EventEmitter {
                 if (
                     this.isMonitorActive &&
                     targetId !== 'computer-screen' &&
-                    event.target !== this.backButton &&
                     // @ts-ignore
-                    !event.target?.closest?.('#computer-screen') &&
-                    // @ts-ignore
-                    !event.target?.closest?.('.back-button')
+                    !event.target?.closest?.('#computer-screen')
                 ) {
                     // Check if click is outside the iframe area
                     this.camera.trigger('leftMonitor');
@@ -253,11 +187,8 @@ export default class MonitorScreen extends EventEmitter {
                 if (
                     this.isMonitorActive &&
                     targetId !== 'computer-screen' &&
-                    element !== this.backButton &&
                     // @ts-ignore
-                    !element?.closest?.('#computer-screen') &&
-                    // @ts-ignore
-                    !element?.closest?.('.back-button')
+                    !element?.closest?.('#computer-screen')
                 ) {
                     this.camera.trigger('leftMonitor');
                     this.isMonitorActive = false;
@@ -327,8 +258,6 @@ export default class MonitorScreen extends EventEmitter {
         };
 
         monitorCover.addEventListener('pointerdown', handleZoomTrigger);
-        monitorCover.addEventListener('mousedown', handleZoomTrigger);
-        monitorCover.addEventListener('touchstart', handleZoomTrigger);
         monitorCover.addEventListener('mouseenter', handleZoomTrigger);
 
         this.monitorCover = monitorCover;
