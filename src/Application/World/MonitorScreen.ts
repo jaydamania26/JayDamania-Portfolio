@@ -40,8 +40,9 @@ export default class MonitorScreen extends EventEmitter {
     mouseClickInProgress: boolean;
     dimmingPlane: THREE.Mesh;
     videoTextures: { [key in string]: THREE.VideoTexture };
-    isMonitorActive: boolean; 
-    backButton: HTMLButtonElement; // NEW: Reference to the button
+    isMonitorActive: boolean;
+    backButton: HTMLButtonElement; // Reference to the button
+    monitorCover: HTMLDivElement; // NEW: Transparent overlay to capture clicks
 
     constructor() {
         super();
@@ -66,19 +67,25 @@ export default class MonitorScreen extends EventEmitter {
         const maxOffset = this.createTextureLayers();
         this.createEnclosingPlanes(maxOffset);
         this.createPerspectiveDimmer(maxOffset);
-        
+
         // Listen for monitor state changes
         this.camera.on('enterMonitor', () => {
             this.isMonitorActive = true;
             if (this.backButton) {
                 this.backButton.style.display = 'block';
             }
+            if (this.monitorCover) {
+                this.monitorCover.style.pointerEvents = 'none';
+            }
         });
-        
+
         this.camera.on('leftMonitor', () => {
             this.isMonitorActive = false;
             if (this.backButton) {
                 this.backButton.style.display = 'none';
+            }
+            if (this.monitorCover) {
+                this.monitorCover.style.pointerEvents = 'auto';
             }
         });
     }
@@ -90,7 +97,7 @@ export default class MonitorScreen extends EventEmitter {
         const btn = document.createElement('button');
         btn.innerHTML = '&#8592; Back'; // Left arrow symbol
         btn.className = 'back-button'; // Add class for easier targeting
-        
+
         // --- STYLING ---
         btn.style.position = 'fixed';
         btn.style.bottom = '30px'; // Position at bottom
@@ -113,7 +120,7 @@ export default class MonitorScreen extends EventEmitter {
         // Add Hover Effect
         btn.onmouseenter = () => btn.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
         btn.onmouseleave = () => btn.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-        
+
         // --- CLICK/TOUCH LOGIC ---
         btn.addEventListener('click', (e) => {
             e.stopPropagation(); // Prevent this click from triggering other things
@@ -147,7 +154,7 @@ export default class MonitorScreen extends EventEmitter {
             (event) => {
                 // @ts-ignore
                 const targetId = event.target?.id;
-                
+
                 // If monitor is active and click is NOT on computer or back button
                 if (
                     this.isMonitorActive &&
@@ -300,6 +307,33 @@ export default class MonitorScreen extends EventEmitter {
         // Create iframe
         const iframe = document.createElement('iframe');
 
+        // Create monitor cover (transparent overlay to capture clicks when zoomed out)
+        const monitorCover = document.createElement('div');
+        monitorCover.id = 'monitor-cover';
+        monitorCover.style.position = 'absolute';
+        monitorCover.style.top = '0';
+        monitorCover.style.left = '0';
+        monitorCover.style.width = '100%';
+        monitorCover.style.height = '100%';
+        monitorCover.style.zIndex = '100'; // Above the iframe
+        monitorCover.style.cursor = 'pointer';
+        monitorCover.style.pointerEvents = 'auto'; // Active by default (when zoomed out)
+
+        // Handle interaction on the cover to zoom in
+        const handleZoomTrigger = (e: Event) => {
+            if (!this.isMonitorActive) {
+                e.stopPropagation();
+                this.camera.trigger('enterMonitor');
+            }
+        };
+
+        monitorCover.addEventListener('pointerdown', handleZoomTrigger);
+        monitorCover.addEventListener('mousedown', handleZoomTrigger);
+        monitorCover.addEventListener('touchstart', handleZoomTrigger);
+        monitorCover.addEventListener('mouseenter', handleZoomTrigger);
+
+        this.monitorCover = monitorCover;
+
         // Bubble mouse move events to the main application, so we can affect the camera
         iframe.onload = () => {
             if (iframe.contentWindow) {
@@ -362,8 +396,9 @@ export default class MonitorScreen extends EventEmitter {
         iframe.frameBorder = '0';
         iframe.title = 'HeffernanOS';
 
-        // Add iframe to container
+        // Add iframe and cover to container
         container.appendChild(iframe);
+        container.appendChild(monitorCover);
 
         // Create CSS plane
         this.createCssPlane(container);
@@ -666,8 +701,8 @@ export default class MonitorScreen extends EventEmitter {
 
             const distance = Math.sqrt(
                 (camPos.x - dimPos.x) ** 2 +
-                    (camPos.y - dimPos.y) ** 2 +
-                    (camPos.z - dimPos.z) ** 2
+                (camPos.y - dimPos.y) ** 2 +
+                (camPos.z - dimPos.z) ** 2
             );
 
             const opacity = 1 / (distance / 10000);
